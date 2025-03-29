@@ -1,10 +1,8 @@
-name: GoScry CI/CD
+name: GoScry CI
 
 on:
   push:
     branches: [ main, master ]
-    tags:
-      - 'v*'
   pull_request:
     branches: [ main, master ]
 
@@ -21,23 +19,12 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.23'
-        check-latest: true
-    
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
     
     - name: Get dependencies
       run: go mod download
-    
+      
     - name: Build
-      run: go build -v ./cmd/goscry
+      run: mkdir -p bin && go build -v -o bin/goscry ./cmd/goscry
     
     - name: Test
       run: go test -v ./...
@@ -46,7 +33,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: goscry
-        path: goscry
+        path: bin/goscry
         retention-days: 5
 
   release:
