@@ -1,6 +1,8 @@
 module github.com/copyleftdev/goscry
 
-go 1.24.1
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20250319231242-a755498943c8
