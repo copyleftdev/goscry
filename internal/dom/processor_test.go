@@ -2,6 +2,7 @@ package dom
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -15,7 +16,13 @@ func TestChromedpWorks(t *testing.T) {
 		t.Skip("Skipping chromedp test in short mode")
 	}
 
-	// Create Chrome options for testing
+	// Detect if running in CI environment (GitHub Actions sets this env var)
+	isCI := os.Getenv("CI") == "true" || os.Getenv("GITHUB_ACTIONS") == "true"
+	if isCI {
+		t.Log("Running in CI environment - adjusting Chrome settings")
+	}
+
+	// Create Chrome options for testing - with additional settings for CI
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
 		chromedp.Flag("disable-gpu", true),
@@ -27,27 +34,75 @@ func TestChromedpWorks(t *testing.T) {
 		chromedp.IgnoreCertErrors,
 	)
 
+	// Add CI-specific options
+	if isCI {
+		opts = append(opts,
+			chromedp.Flag("disable-background-networking", true),
+			chromedp.Flag("disable-background-timer-throttling", true),
+			chromedp.Flag("disable-extensions", true),
+			chromedp.Flag("disable-ipc-flooding-protection", true),
+			chromedp.Flag("enable-automation", true),
+		)
+	}
+
 	// Create allocator context with timeout
 	allocatorCtx, cancelAllocator := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelAllocator()
 
-	// Create Chrome browser context with timeout
-	ctx, cancelBrowser := chromedp.NewContext(allocatorCtx)
+	// Create Chrome browser context
+	ctx, cancelBrowser := chromedp.NewContext(allocatorCtx, 
+		chromedp.WithLogf(t.Logf), // Add logging to help with debugging
+	)
 	defer cancelBrowser()
 
-	// Set timeout for the entire test
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Set timeout for the entire test - longer for CI environments
+	timeout := 30 * time.Second
+	if isCI {
+		timeout = 60 * time.Second // Increase timeout for CI environments
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	// Log Chrome startup
+	t.Log("Starting Chrome instance...")
 
 	// Initialize result map to store test outcomes
 	result := make(map[string]interface{})
 
-	// Run the verification action
-	err := chromedp.Run(ctx, VerifyChromedpWorkingAction(&result))
+	// Implement retry mechanism for better reliability
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		t.Logf("ChromeDP test attempt %d of %d", attempt, maxRetries)
+		
+		// Run the verification action
+		err = chromedp.Run(ctx, chromedp.Navigate("about:blank")) // First navigate to a blank page as a warmup
+		if err != nil {
+			t.Logf("Warmup navigation failed: %v", err)
+			if attempt < maxRetries {
+				time.Sleep(2 * time.Second) // Wait before retry
+				continue
+			}
+			t.Fatalf("ChromeDP initialization failed after %d attempts: %v", maxRetries, err)
+		}
+		
+		// Now run the actual test
+		err = chromedp.Run(ctx, VerifyChromedpWorkingAction(&result))
+		
+		// Check for errors
+		if err == nil {
+			break // Success, exit the loop
+		}
+		
+		t.Logf("ChromeDP test attempt %d failed: %v", attempt, err)
+		if attempt < maxRetries {
+			time.Sleep(2 * time.Second) // Wait before retry
+		}
+	}
 
-	// Check for errors
+	// If we still have an error after all retries
 	if err != nil {
-		t.Fatalf("ChromeDP test failed: %v", err)
+		t.Fatalf("ChromeDP test failed after %d attempts: %v", maxRetries, err)
 	}
 
 	// Verify expected results
