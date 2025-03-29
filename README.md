@@ -109,6 +109,58 @@ sequenceDiagram
 
 3.  Alternatively, download a pre-built binary from the [releases page](https://github.com/copyleftdev/goscry/releases).
 
+## Docker Deployment
+
+GoScry can be easily deployed using Docker and Docker Compose with a variety of deployment options.
+
+### Quick Start with Docker
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/copyleftdev/goscry.git
+   cd goscry
+   ```
+
+2. Start the container:
+   ```bash
+   docker compose up -d
+   ```
+
+3. Access the API at http://localhost:8090
+
+### Deployment Options
+
+GoScry provides several pre-configured deployment profiles:
+
+1. **Basic Deployment** - Just the GoScry service:
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Production Deployment** - Includes Traefik reverse proxy with TLS termination:
+   ```bash
+   docker compose --profile production up -d
+   ```
+
+3. **Monitoring Deployment** - Adds Prometheus and Grafana for observability:
+   ```bash
+   docker compose --profile monitoring up -d
+   ```
+
+### Docker Configuration
+
+- **Environment Variables**: Configure the service using environment variables:
+  - `GOSCRY_API_KEY`: API key for authentication
+  - `LOG_LEVEL`: Logging level (debug, info, warn, error)
+  - `AUTO_GENERATE_API_KEY`: Auto-generate a secure API key
+
+- **Volumes**: The Docker setup includes persistent volumes for:
+  - Configuration data
+  - Prometheus metrics (when using monitoring profile)
+  - Grafana dashboards (when using monitoring profile)
+
+For detailed Docker deployment instructions, see [DOCKER.md](DOCKER.md).
+
 ## Continuous Integration and Deployment
 
 GoScry uses GitHub Actions for CI/CD:

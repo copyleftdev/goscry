@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # Main GoScry API service
+  goscry:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goscry:latest
+    container_name: goscry
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      - TZ=UTC
+      - GOSCRY_SERVER_PORT=8080
+      - GOSCRY_SECURITY_APIKEY=${GOSCRY_API_KEY:-changeme}
+      - GOSCRY_LOG_LEVEL=${LOG_LEVEL:-info}
+      - GOSCRY_BROWSER_MAXSESSIONS=20
+      - GOSCRY_BROWSER_ACTIONTIMEOUT=60s
+      - AUTO_GENERATE_API_KEY=${AUTO_GENERATE_API_KEY:-false}
+    volumes:
+      - goscry-data:/var/lib/goscry
+      - ./config.yaml:/etc/goscry/config.yaml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - goscry-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional Traefik reverse proxy for TLS termination and routing
+  traefik:
+    image: traefik:v2.10
+    container_name: goscry-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/config"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/config:/etc/traefik/config:ro
+      - traefik-certs:/etc/traefik/acme
+    networks:
+      - goscry-network
+    depends_on:
+      - goscry
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.goscry.example.com`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH:-admin:$$apr1$$q8eZFHjF$$Fvx6TY6pgm92V037vkw0L0}"
+    profiles:
+      - production
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: goscry-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - goscry-network
+    depends_on:
+      - goscry
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: goscry-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    networks:
+      - goscry-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+networks:
+  goscry-network:
+    driver: bridge
+
+volumes:
+  goscry-data:
+    driver: local
+  traefik-certs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
