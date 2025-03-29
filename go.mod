@@ -1,4 +1,5 @@
 module github.com/copyleftdev/goscry
+
 go 1.24.1
 
 require (
@@ -9,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/pquerna/otp v1.4.0
 	github.com/spf13/viper v1.20.1
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.38.0
 	golang.org/x/sync v0.12.0
@@ -17,6 +19,7 @@ require (
 require (
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
@@ -24,6 +27,7 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.14.0 // indirect

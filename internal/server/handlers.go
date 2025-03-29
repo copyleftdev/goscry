@@ -129,14 +129,14 @@ func (h *APIHandler) HandleProvide2FACode(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		// Check error type for better status codes
 		if strings.Contains(err.Error(), "not found") {
-			h.respondError(w, http.StatusNotFound, err.Error())
+			h.respondError(w, http.StatusNotFound, "%s", err.Error())
 		} else if strings.Contains(err.Error(), "is not waiting for 2FA code") {
-			h.respondError(w, http.StatusConflict, err.Error()) // 409 Conflict might fit
+			h.respondError(w, http.StatusConflict, "%s", err.Error()) // 409 Conflict might fit
 		} else if strings.Contains(err.Error(), "failed to signal 2FA code") {
-			h.respondError(w, http.StatusRequestTimeout, err.Error()) // 408 might indicate timeout
+			h.respondError(w, http.StatusRequestTimeout, "%s", err.Error()) // 408 might indicate timeout
 		} else {
 			h.logger.Printf("Error providing 2FA code for task %s: %v", taskIDStr, err)
-			h.respondError(w, http.StatusInternalServerError, err.Error())
+			h.respondError(w, http.StatusInternalServerError, "%s", err.Error())
 		}
 		return
 	}
