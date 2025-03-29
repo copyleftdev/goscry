@@ -1,17 +1,18 @@
+Okay, here is the updated `README.md` content with the new "Go Code Quality: Expert" badge added to the badge section.
+
+**Important:** This assumes you have saved the SVG code provided previously into a file named `badge-go-quality-expert.svg` inside a `media/` directory within your repository. If you save it elsewhere, please adjust the path in the `<img>` tag accordingly.
+
+```markdown
 # GoScry
-
-
 
 <p align="center">
   <img src="media/logo.png" alt="GoScry Logo" width="200">
 </p>
-![Go Code Quality: Expert](media/goscry-quality-badge.svg)
-<p align="center"> 
 
-
+<p align="center">
   <a href="https://github.com/copyleftdev/goscry/actions/workflows/ci.yml"><img src="https://github.com/copyleftdev/goscry/actions/workflows/ci.yml/badge.svg" alt="GoScry CI"></a>
   <a href="https://goreportcard.com/report/github.com/copyleftdev/goscry"><img src="https://goreportcard.com/badge/github.com/copyleftdev/goscry" alt="Go Report Card"></a>
-  <img src="https://img.shields.io/github/go-mod/go-version/copyleftdev/goscry" alt="Go Version">
+  <img src="media/badge-go-quality-expert.svg" alt="Go Code Quality: Expert">  <img src="https://img.shields.io/github/go-mod/go-version/copyleftdev/goscry" alt="Go Version">
   <a href="https://github.com/copyleftdev/goscry/releases"><img src="https://img.shields.io/github/v/release/copyleftdev/goscry" alt="Latest Release"></a>
   <a href="https://pkg.go.dev/github.com/copyleftdev/goscry"><img src="https://pkg.go.dev/badge/github.com/copyleftdev/goscry.svg" alt="Go Reference"></a>
   <a href="https://github.com/copyleftdev/goscry/blob/master/LICENSE"><img src="https://img.shields.io/github/license/copyleftdev/goscry" alt="License"></a>
@@ -20,7 +21,6 @@
   <img src="https://img.shields.io/docker/pulls/copyleftdev/goscry" alt="Docker Pulls">
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-brightgreen" alt="Platforms">
 </p>
-![Go Code Quality: Expert](media/goscry-quality-badge.svg)
 
 GoScry is a server application written in Go that acts as a bridge between a controlling system (like an LLM or script) and a web browser. It uses the Chrome DevTools Protocol (CDP) to interact with websites based on tasks submitted via its API. GoScry can perform actions like navigation, clicking, typing, handling authentication (with hooks for 2FA), and extracting DOM content. Results and status updates can be reported back via webhooks using the Model Context Protocol (MCP) format.
 
@@ -58,7 +58,7 @@ sequenceDiagram
     Site-->>-CDP: HTTP Response (HTML, etc.)
     CDP-->>-BM: Action Result / DOM State
     BM-->>TM: Action Completed / Error
-    
+
     alt DOM AST Retrieval
         Client->>+GS: POST /api/v1/dom/ast (URL, ParentSelector)
         GS->>+DOM: GetDomAST(URL, ParentSelector)
@@ -69,7 +69,7 @@ sequenceDiagram
         DOM-->>-GS: DOM AST Structure
         GS-->>-Client: 200 OK (AST JSON)
     end
-    
+
     alt 2FA Required (e.g., after login action)
         TM->>BM: ExecuteAction(detect2FAPrompt)
         BM->>CDP: Check page state for 2FA indicators
@@ -116,7 +116,7 @@ sequenceDiagram
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/copyleftdev/goscry.git
+    git clone [https://github.com/copyleftdev/goscry.git](https://github.com/copyleftdev/goscry.git)
     cd goscry
     ```
 2.  Build the executable:
@@ -135,7 +135,7 @@ GoScry can be easily deployed using Docker and Docker Compose with a variety of 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/copyleftdev/goscry.git
+   git clone [https://github.com/copyleftdev/goscry.git](https://github.com/copyleftdev/goscry.git)
    cd goscry
    ```
 
@@ -258,7 +258,7 @@ The `actions` array in the submit request defines the steps:
 
 | Type              | Description                                                                 | `selector` Used | `value` Used                                                               | `format` Used               |
 | :---------------- | :-------------------------------------------------------------------------- | :-------------- | :------------------------------------------------------------------------- | :-------------------------- |
-| `navigate`        | Navigates the browser to a URL.                                             | No              | URL string                                                                 | No                          |
+| `Maps`        | Navigates the browser to a URL.                                             | No              | URL string                                                                 | No                          |
 | `wait_visible`    | Waits for an element matching the selector to become visible.               | Yes             | Optional duration (e.g., "5s", default "30s")                              | No                          |
 | `wait_hidden`     | Waits for an element matching the selector to become hidden.                | Yes             | Optional duration (e.g., "5s", default "30s")                              | No                          |
 | `wait_delay`      | Pauses execution for a specified duration.                                  | No              | Duration string (e.g., "2s", "500ms")                                      | No                          |
@@ -321,7 +321,7 @@ curl -X POST http://localhost:8080/api/v1/dom/ast \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
-    "url": "https://example.com",
+    "url": "[https://example.com](https://example.com)",
     "parent_selector": "#main-content"
   }'
 ```
@@ -330,9 +330,9 @@ curl -X POST http://localhost:8080/api/v1/dom/ast \
 
 ```json
 {
-  "nodeType": "element", 
-  "tagName": "div", 
-  "attributes": {"id": "main-content"}, 
+  "nodeType": "element",
+  "tagName": "div",
+  "attributes": {"id": "main-content"},
   "children": [
     {
       "nodeType": "element",
@@ -366,3 +366,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+```
