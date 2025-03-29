@@ -1,14 +1,16 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/chromedp/chromedp"
+	"github.com/copyleftdev/goscry/internal/dom"
 	"github.com/copyleftdev/goscry/internal/tasks"
 	"github.com/copyleftdev/goscry/internal/taskstypes"
 	"github.com/go-chi/chi/v5"
@@ -42,6 +44,11 @@ type Provide2FACodeRequest struct {
 	Code string `json:"code"`
 }
 
+type GetDomASTRequest struct {
+	URL            string `json:"url"`
+	ParentSelector string `json:"parent_selector,omitempty"`
+}
+
 func (h *APIHandler) HandleSubmitTask(w http.ResponseWriter, r *http.Request) {
 	var req SubmitTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -50,21 +57,7 @@ func (h *APIHandler) HandleSubmitTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if len(req.Actions) == 0 {
-		h.respondError(w, http.StatusBadRequest, "Task must contain at least one action")
-		return
-	}
-
-	// Validate actions
-	for i, action := range req.Actions {
-		if action.Type == taskstypes.ActionNavigate && action.Value == "" {
-			h.respondError(w, http.StatusBadRequest, "Navigation action at index %d requires a URL", i)
-			return
-		}
-	}
-
-	// Note: req.Credentials contains sensitive data. Avoid logging it directly.
-	// Create a new Task using taskstypes
+	// Create a task ID
 	task := &taskstypes.Task{
 		ID:            uuid.New(),
 		Status:        taskstypes.StatusPending,
@@ -72,40 +65,40 @@ func (h *APIHandler) HandleSubmitTask(w http.ResponseWriter, r *http.Request) {
 		Credentials:   req.Credentials,
 		TwoFactorAuth: req.TwoFactorAuth,
 		CallbackURL:   req.CallbackURL,
-		TfaCodeChan:   make(chan string, 1),
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
+		TfaCodeChan:   make(chan string, 1), // Buffered channel for 2FA code
 	}
 
+	// Queue the task
 	err := h.taskManager.SubmitTask(task)
 	if err != nil {
-		// Handle specific errors, e.g., duplicate ID, although unlikely with UUIDs here
-		h.logger.Printf("Error submitting task: %v", err)
 		h.respondError(w, http.StatusInternalServerError, "Failed to submit task: %v", err)
 		return
 	}
 
-	h.logger.Printf("Submitted new task with ID: %s", task.ID.String())
-	h.respondJSON(w, http.StatusAccepted, SubmitTaskResponse{TaskID: task.ID.String()})
+	resp := SubmitTaskResponse{
+		TaskID: task.ID.String(),
+	}
+	h.respondJSON(w, http.StatusAccepted, resp)
 }
 
 func (h *APIHandler) HandleGetTaskStatus(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid task ID format: %v", err)
+		h.respondError(w, http.StatusBadRequest, "Invalid task ID format")
 		return
 	}
 
 	task, err := h.taskManager.GetTaskStatus(taskID)
 	if err != nil {
-		// Assuming GetTaskStatus returns a specific error type for not found
-		// For now, check the error string (improve with typed errors later)
-		if errors.Is(err, fmt.Errorf("task with ID %s not found", taskIDStr)) || strings.Contains(err.Error(), "not found") {
+		// Check for not found error based on error message
+		if errors.Is(err, fmt.Errorf("task not found")) || 
+		   err.Error() == "task not found" {
 			h.respondError(w, http.StatusNotFound, "Task not found")
 		} else {
-			h.logger.Printf("Error retrieving task status for %s: %v", taskIDStr, err)
-			h.respondError(w, http.StatusInternalServerError, "Failed to retrieve task status")
+			h.respondError(w, http.StatusInternalServerError, "Failed to get task: %v", err)
 		}
 		return
 	}
@@ -113,11 +106,66 @@ func (h *APIHandler) HandleGetTaskStatus(w http.ResponseWriter, r *http.Request)
 	h.respondJSON(w, http.StatusOK, task)
 }
 
+// HandleGetDomAST handles requests to get a DOM AST from a URL with optional parent selector
+func (h *APIHandler) HandleGetDomAST(w http.ResponseWriter, r *http.Request) {
+	var req GetDomASTRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "Invalid request body: %v", err)
+		return
+	}
+	defer r.Body.Close()
+
+	if req.URL == "" {
+		h.respondError(w, http.StatusBadRequest, "URL is required")
+		return
+	}
+
+	h.logger.Printf("Processing DOM AST request for URL: %s, parent selector: %s", req.URL, req.ParentSelector)
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Set up ChromeDP
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-setuid-sandbox", true),
+		chromedp.WindowSize(1280, 1024),
+	)
+
+	// Create allocator
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	// Create browser context
+	browserCtx, browserCancel := chromedp.NewContext(allocCtx)
+	defer browserCancel()
+
+	// Initialize result
+	var domAST dom.DomNode
+
+	// Run the DOM AST action
+	err := chromedp.Run(browserCtx,
+		chromedp.Navigate(req.URL),
+		chromedp.Sleep(2*time.Second), // Give the page time to load
+		dom.GetDomASTAction(req.ParentSelector, &domAST),
+	)
+
+	if err != nil {
+		h.respondError(w, http.StatusInternalServerError, "Failed to get DOM AST: %v", err)
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, domAST)
+}
+
 func (h *APIHandler) HandleProvide2FACode(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := chi.URLParam(r, "taskID")
 	taskID, err := uuid.Parse(taskIDStr)
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid task ID format: %v", err)
+		h.respondError(w, http.StatusBadRequest, "Invalid task ID format")
 		return
 	}
 
@@ -129,27 +177,34 @@ func (h *APIHandler) HandleProvide2FACode(w http.ResponseWriter, r *http.Request
 	defer r.Body.Close()
 
 	if req.Code == "" {
-		h.respondError(w, http.StatusBadRequest, "2FA code cannot be empty")
+		h.respondError(w, http.StatusBadRequest, "2FA code is required")
+		return
+	}
+
+	task, err := h.taskManager.GetTaskStatus(taskID)
+	if err != nil {
+		// Check for not found error based on error message
+		if errors.Is(err, fmt.Errorf("task not found")) || 
+		   err.Error() == "task not found" {
+			h.respondError(w, http.StatusNotFound, "Task not found")
+		} else {
+			h.respondError(w, http.StatusInternalServerError, "Failed to get task: %v", err)
+		}
+		return
+	}
+
+	if string(task.Status) != string(tasks.StatusWaitingFor2FA) {
+		h.respondError(w, http.StatusBadRequest, "Task is not waiting for 2FA")
 		return
 	}
 
 	err = h.taskManager.Provide2FACode(taskID, req.Code)
 	if err != nil {
-		// Check error type for better status codes
-		if strings.Contains(err.Error(), "not found") {
-			h.respondError(w, http.StatusNotFound, "%s", err.Error())
-		} else if strings.Contains(err.Error(), "is not waiting for 2FA code") {
-			h.respondError(w, http.StatusConflict, "%s", err.Error()) // 409 Conflict might fit
-		} else if strings.Contains(err.Error(), "failed to signal 2FA code") {
-			h.respondError(w, http.StatusRequestTimeout, "%s", err.Error()) // 408 might indicate timeout
-		} else {
-			h.logger.Printf("Error providing 2FA code for task %s: %v", taskIDStr, err)
-			h.respondError(w, http.StatusInternalServerError, "%s", err.Error())
-		}
+		h.respondError(w, http.StatusInternalServerError, "Failed to provide 2FA code: %v", err)
 		return
 	}
 
-	h.respondJSON(w, http.StatusOK, map[string]string{"message": "2FA code received"})
+	h.respondJSON(w, http.StatusAccepted, map[string]string{"status": "2FA code accepted"})
 }
 
 // --- Helper Functions ---
@@ -158,33 +213,29 @@ func (h *APIHandler) respondJSON(w http.ResponseWriter, status int, payload inte
 	response, err := json.Marshal(payload)
 	if err != nil {
 		h.logger.Printf("Error marshalling JSON response: %v", err)
-		// Fallback to plain text error response
-		h.respondError(w, http.StatusInternalServerError, "Failed to marshal JSON response")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Internal Server Error"}`))
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, err = w.Write(response)
-	if err != nil {
-		h.logger.Printf("Error writing JSON response: %v", err)
-	}
+	w.Write(response)
 }
 
 func (h *APIHandler) respondError(w http.ResponseWriter, status int, format string, args ...interface{}) {
-	errorMessage := fmt.Sprintf(format, args...)
-	response := map[string]string{"error": errorMessage}
-	jsonResponse, err := json.Marshal(response)
-	// If marshalling fails, send plain text error
-	contentType := "application/json; charset=utf-8"
+	message := fmt.Sprintf(format, args...)
+	h.logger.Printf("Error response: %s", message)
+
+	response, err := json.Marshal(map[string]string{"error": message})
 	if err != nil {
-		h.logger.Printf("Error marshalling JSON error response: %v", err)
-		jsonResponse = []byte(fmt.Sprintf(`{"error":"%s"}`, errorMessage)) // Basic fallback
+		h.logger.Printf("Error marshalling error response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Internal Server Error"}`))
+		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, writeErr := w.Write(jsonResponse)
-	if writeErr != nil {
-		h.logger.Printf("Error writing error response: %v", writeErr)
-	}
+	w.Write(response)
 }

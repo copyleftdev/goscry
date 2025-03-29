@@ -55,6 +55,7 @@ func NewServer(cfg *config.Config, tm *tasks.Manager, logger *log.Logger) *Serve
 		r.Post("/tasks", apiHandler.HandleSubmitTask)
 		r.Get("/tasks/{taskID}", apiHandler.HandleGetTaskStatus)
 		r.Post("/tasks/{taskID}/2fa", apiHandler.HandleProvide2FACode)
+		r.Post("/dom/ast", apiHandler.HandleGetDomAST)
 	})
 
 	// Health check endpoint
