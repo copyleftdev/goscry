@@ -93,6 +93,18 @@ sequenceDiagram
     ```
     This will create the `goscry` binary in the project root.
 
+3.  Alternatively, download a pre-built binary from the [releases page](https://github.com/copyleftdev/goscry/releases).
+
+## Continuous Integration and Deployment
+
+GoScry uses GitHub Actions for CI/CD:
+
+- Automated testing on each push to main and pull request
+- Automated binary builds for Linux, macOS (Intel and ARM), and Windows
+- Automatic releases when a version tag is pushed (e.g., `v1.0.0`)
+
+For detailed information about the release process, see [RELEASING.md](RELEASING.md).
+
 ## Configuration
 
 GoScry is configured via a `config.yaml` file or environment variables.
