@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/copyleftdev/goscry/actions/workflows/ci.yml"><img src="https://github.com/copyleftdev/goscry/actions/workflows/ci.yml/badge.svg" alt="GoScry CI"></a>
   <a href="https://goreportcard.com/report/github.com/copyleftdev/goscry"><img src="https://goreportcard.com/badge/github.com/copyleftdev/goscry" alt="Go Report Card"></a>
-  <img src="media/badge-go-quality-expert.svg" alt="Go Code Quality: Expert">  <img src="https://img.shields.io/github/go-mod/go-version/copyleftdev/goscry" alt="Go Version">
+  <img src="media/goscry-quality-badge.svg" alt="Go Code Quality: Expert">  <img src="https://img.shields.io/github/go-mod/go-version/copyleftdev/goscry" alt="Go Version">
   <a href="https://github.com/copyleftdev/goscry/releases"><img src="https://img.shields.io/github/v/release/copyleftdev/goscry" alt="Latest Release"></a>
   <a href="https://pkg.go.dev/github.com/copyleftdev/goscry"><img src="https://pkg.go.dev/badge/github.com/copyleftdev/goscry.svg" alt="Go Reference"></a>
   <a href="https://github.com/copyleftdev/goscry/blob/master/LICENSE"><img src="https://img.shields.io/github/license/copyleftdev/goscry" alt="License"></a>
