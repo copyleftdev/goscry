@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  readTimeout: 15s
+  writeTimeout: 15s
+  idleTimeout: 60s
+
+browser:
+  executablePath: "" # "/usr/bin/google-chrome-stable" or "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+  headless: true
+  userDataDir: "" # "/path/to/persistent/profile"
+  actionTimeout: 30s
+  shutdownTimeout: 10s
+  maxSessions: 10
+
+log:
+  level: "info" # options: debug, info, warn, error
+
+security:
+  allowedOrigins: # Example: ["http://localhost:3000", "https://yourfrontend.com"]
+    - "*"
+  apiKey: "" # Set via GOSCRY_SECURITY_APIKEY environment variable for security

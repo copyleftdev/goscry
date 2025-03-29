@@ -1,0 +1,60 @@
+# Binaries
+goscry
+goscry.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+/vendor/
+/dist/
+/build/
+/bin/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE / Editor directories
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.sublime-project
+*.sublime-workspace
+*.komodoproject
+
+# Configuration - Add your actual config file if it contains secrets!
+# config.yaml
+
+# Coverage reports
+coverage.*
+profile.*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# GoLand specific files
+/.idea_modules/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
