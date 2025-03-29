@@ -1,5 +1,9 @@
 # GoScry
 
+<p align="center">
+  <img src="media/logo.png" alt="GoScry Logo" width="200">
+</p>
+
 GoScry is a server application written in Go that acts as a bridge between a controlling system (like an LLM or script) and a web browser. It uses the Chrome DevTools Protocol (CDP) to interact with websites based on tasks submitted via its API. GoScry can perform actions like navigation, clicking, typing, handling authentication (with hooks for 2FA), and extracting DOM content. Results and status updates can be reported back via webhooks using the Model Context Protocol (MCP) format.
 
 ## Features
