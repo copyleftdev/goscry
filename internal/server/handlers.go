@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/copyleftdev/goscry/internal/tasks"
 	"github.com/copyleftdev/goscry/internal/taskstypes"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type APIHandler struct {
@@ -31,7 +31,7 @@ type SubmitTaskRequest struct {
 	Actions       []taskstypes.Action          `json:"actions"`
 	Credentials   *taskstypes.Credentials      `json:"credentials,omitempty"` // Sent in request, handled securely
 	TwoFactorAuth taskstypes.TwoFactorAuthInfo `json:"two_factor_auth"`
-	CallbackURL   string                      `json:"callback_url,omitempty"`
+	CallbackURL   string                       `json:"callback_url,omitempty"`
 }
 
 type SubmitTaskResponse struct {
@@ -53,6 +53,14 @@ func (h *APIHandler) HandleSubmitTask(w http.ResponseWriter, r *http.Request) {
 	if len(req.Actions) == 0 {
 		h.respondError(w, http.StatusBadRequest, "Task must contain at least one action")
 		return
+	}
+
+	// Validate actions
+	for i, action := range req.Actions {
+		if action.Type == taskstypes.ActionNavigate && action.Value == "" {
+			h.respondError(w, http.StatusBadRequest, "Navigation action at index %d requires a URL", i)
+			return
+		}
 	}
 
 	// Note: req.Credentials contains sensitive data. Avoid logging it directly.

@@ -85,7 +85,13 @@ func (m *Manager) ExecuteTask(task *taskstypes.Task) (*taskstypes.TaskResult, er
 	defer browserCancel()
 
 	// Store the task's browser context ID for future reference if needed
-	task.BrowserContextID = chromedp.FromContext(browserCtx).Target.TargetID.String()
+	if chromeTarget := chromedp.FromContext(browserCtx); chromeTarget != nil && chromeTarget.Target != nil {
+		task.BrowserContextID = chromeTarget.Target.TargetID.String()
+	} else {
+		m.logger.Printf("Warning: Could not get Target ID, browser context might not be fully initialized")
+		// Set a placeholder value instead of nil
+		task.BrowserContextID = "unknown"
+	}
 
 	// Initialize the result
 	result := &taskstypes.TaskResult{

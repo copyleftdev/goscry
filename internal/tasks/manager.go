@@ -3,6 +3,7 @@ package tasks
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/copyleftdev/goscry/internal/config"
 	"github.com/copyleftdev/goscry/internal/taskstypes"
+	"github.com/google/uuid"
 )
 
 const twoFAWaitTimeout = 5 * time.Minute // Max time to wait for 2FA code
@@ -39,34 +40,34 @@ type twoFactorAuthRequest struct {
 }
 
 type Manager struct {
-	cfg            *config.Config
+	cfg             *config.Config
 	browserExecutor BrowserExecutor
-	logger         *log.Logger
-	tasks          map[uuid.UUID]*taskstypes.Task
-	mu             sync.RWMutex
-	mcpConn        *mcpClient // Changed to our stub type
+	logger          *log.Logger
+	tasks           map[uuid.UUID]*taskstypes.Task
+	mu              sync.RWMutex
+	mcpConn         *mcpClient // Changed to our stub type
 }
 
 // NewManager creates a new task manager with the provided browser manager and logger.
 func NewManager(cfg *config.Config, browserExecutor BrowserExecutor, logger *log.Logger) *Manager {
 	// Create a simple manager without MCP connection for now
 	mgr := &Manager{
-		cfg:            cfg,
+		cfg:             cfg,
 		browserExecutor: browserExecutor,
-		logger:         logger,
-		tasks:          make(map[uuid.UUID]*taskstypes.Task),
+		logger:          logger,
+		tasks:           make(map[uuid.UUID]*taskstypes.Task),
 	}
-	
+
 	// Add stub MCP client if Config has the fields, otherwise use a default
 	mcpEndpoint := "http://localhost:8080"
 	mcpApiKey := "default-key"
-	
+
 	// Check if cfg.MCPConfig exists through reflection to avoid compile errors
 	if cfg != nil {
 		// This is just a placeholder - in real code we'd check if cfg.MCPConfig exists
 		mgr.logger.Println("Using default MCP configuration")
 	}
-	
+
 	mgr.mcpConn = newMCPClient(mcpEndpoint, mcpApiKey)
 	return mgr
 }
@@ -82,10 +83,10 @@ func (m *Manager) SubmitTask(task *taskstypes.Task) error {
 
 	// Store the task in the manager
 	m.tasks[task.ID] = task
-	
+
 	// Start task execution in a goroutine
 	go m.executeTask(task)
-	
+
 	return nil
 }
 
@@ -93,12 +94,12 @@ func (m *Manager) SubmitTask(task *taskstypes.Task) error {
 func (m *Manager) GetTaskStatus(id uuid.UUID) (*taskstypes.Task, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	task, exists := m.tasks[id]
 	if !exists {
 		return nil, fmt.Errorf("task with ID %s not found", id)
 	}
-	
+
 	// Return a copy to avoid race conditions
 	taskCopy := *task
 	return &taskCopy, nil
@@ -109,16 +110,16 @@ func (m *Manager) Provide2FACode(id uuid.UUID, code string) error {
 	m.mu.RLock()
 	task, exists := m.tasks[id]
 	m.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("task with ID %s not found", id)
 	}
-	
+
 	// Check if the task is waiting for 2FA
 	if task.Status != taskstypes.StatusWaitingFor2FA {
 		return fmt.Errorf("task is not waiting for 2FA code (status: %s)", task.Status)
 	}
-	
+
 	// Send the code to the task's channel
 	select {
 	case task.TfaCodeChan <- code:
@@ -134,10 +135,10 @@ func (m *Manager) Provide2FACode(id uuid.UUID, code string) error {
 func (m *Manager) executeTask(task *taskstypes.Task) {
 	// Update initial status to running
 	m.updateTaskStatus(task, taskstypes.StatusRunning)
-	
+
 	// Start browser execution
 	result, err := m.browserExecutor.ExecuteTask(task)
-	
+
 	// Update task with final status based on execution result
 	if err != nil {
 		m.logger.Printf("Error executing task %s: %v", task.ID, err)
@@ -149,7 +150,7 @@ func (m *Manager) executeTask(task *taskstypes.Task) {
 		task.Result = result
 		m.updateTaskStatus(task, taskstypes.StatusCompleted)
 	}
-	
+
 	// Send callback notification if configured
 	if task.CallbackURL != "" {
 		go m.notifyCallback(task)
@@ -169,9 +170,9 @@ func (m *Manager) notifyCallback(task *taskstypes.Task) {
 	if task.CallbackURL == "" {
 		return
 	}
-	
+
 	m.logger.Printf("Sending callback notification for task %s to %s", task.ID, task.CallbackURL)
-	
+
 	// Helper function to marshal task for callback - add to taskstypes package later
 	marshalForCallback := func(task *taskstypes.Task) ([]byte, error) {
 		// Create a simplified version with only the fields needed for callback
@@ -194,51 +195,60 @@ func (m *Manager) notifyCallback(task *taskstypes.Task) {
 			CreatedAt:     task.CreatedAt,
 			UpdatedAt:     task.UpdatedAt,
 		}
-		
+
 		return json.Marshal(callbackTask)
 	}
-	
+
 	// Marshal task data for the callback
 	taskData, err := marshalForCallback(task)
 	if err != nil {
 		m.logger.Printf("Error marshaling task data for callback: %v", err)
 		return
 	}
-	
+
 	// Create the request
 	req, err := http.NewRequest("POST", task.CallbackURL, bytes.NewBuffer(taskData))
 	if err != nil {
 		m.logger.Printf("Error creating callback request: %v", err)
 		return
 	}
-	
+
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add authentication if needed - using stub values for now
 	callbackUsername := "callback-user"
 	callbackPassword := "callback-password"
-	
+
 	// Check for callback auth configuration - stub implementation
 	if m.cfg != nil {
 		// In real code, we would check if m.cfg.CallbackAuth exists
 		m.logger.Println("Using default callback authentication")
-		
+
 		// Set basic auth if needed
 		if callbackUsername != "" && callbackPassword != "" {
 			req.SetBasicAuth(callbackUsername, callbackPassword)
 		}
 	}
-	
+
 	// Make the request
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				// In production, this should be set to false
+				// Only use InsecureSkipVerify: true for development/testing
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		m.logger.Printf("Error sending callback: %v", err)
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	// Check response
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		m.logger.Printf("Callback notification sent successfully (status: %s)", resp.Status)
@@ -251,7 +261,7 @@ func (m *Manager) notifyCallback(task *taskstypes.Task) {
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Cancel any running tasks (in a real implementation)
 	for id, task := range m.tasks {
 		if task.Status == taskstypes.StatusRunning || task.Status == taskstypes.StatusWaitingFor2FA {
@@ -259,7 +269,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 			task.Status = taskstypes.StatusCancelled
 		}
 	}
-	
+
 	m.logger.Println("Task manager shut down")
 	return nil
 }
