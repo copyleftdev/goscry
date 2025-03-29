@@ -7,41 +7,21 @@ on:
     branches: [ main, master ]
 
 jobs:
-  debug:
-    name: Debug Repository Structure
+  test:
+    name: Test
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
       with:
-        fetch-depth: 0
+        go-version: '1.23'
     
-    - name: Debug - Repository Info
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Repository contents:"
-        ls -la
-        echo "Directory structure:"
-        find . -type d -not -path "*/\.*" | sort
-        echo "Go files:"
-        find . -name "*.go" | sort
-        echo "Git status:"
-        git status
+    - name: Get dependencies
+      run: go mod download
     
-    - name: Go Info
-      run: |
-        go version
-        go env
-    
-    - name: List Go modules
-      run: |
-        cat go.mod
-    
-    - name: Run tests for available packages
-      run: |
-        echo "Testing available packages:"
-        for pkg in $(go list ./... 2>/dev/null || echo "None found"); do
-          echo "Found package: $pkg"
-        done
-        go test -v ./internal/... || echo "Some tests failed or no tests found"
+    - name: Run tests
+      run: go test -v ./internal/...
