@@ -4,6 +4,19 @@
   <img src="media/logo.png" alt="GoScry Logo" width="200">
 </p>
 
+<p align="center">
+  <a href="https://github.com/copyleftdev/goscry/actions"><img src="https://github.com/copyleftdev/goscry/workflows/Build/badge.svg" alt="Build Status"></a>
+  <a href="https://goreportcard.com/report/github.com/copyleftdev/goscry"><img src="https://goreportcard.com/badge/github.com/copyleftdev/goscry" alt="Go Report Card"></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/copyleftdev/goscry" alt="Go Version">
+  <a href="https://github.com/copyleftdev/goscry/releases"><img src="https://img.shields.io/github/v/release/copyleftdev/goscry" alt="Latest Release"></a>
+  <a href="https://pkg.go.dev/github.com/copyleftdev/goscry"><img src="https://pkg.go.dev/badge/github.com/copyleftdev/goscry.svg" alt="Go Reference"></a>
+  <a href="https://github.com/copyleftdev/goscry/blob/master/LICENSE"><img src="https://img.shields.io/github/license/copyleftdev/goscry" alt="License"></a>
+  <a href="https://github.com/copyleftdev/goscry/issues"><img src="https://img.shields.io/github/issues/copyleftdev/goscry" alt="Issues"></a>
+  <a href="https://github.com/copyleftdev/goscry/stargazers"><img src="https://img.shields.io/github/stars/copyleftdev/goscry" alt="Stars"></a>
+  <img src="https://img.shields.io/docker/pulls/copyleftdev/goscry" alt="Docker Pulls">
+  <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-brightgreen" alt="Platforms">
+</p>
+
 GoScry is a server application written in Go that acts as a bridge between a controlling system (like an LLM or script) and a web browser. It uses the Chrome DevTools Protocol (CDP) to interact with websites based on tasks submitted via its API. GoScry can perform actions like navigation, clicking, typing, handling authentication (with hooks for 2FA), and extracting DOM content. Results and status updates can be reported back via webhooks using the Model Context Protocol (MCP) format.
 
 ## Features
