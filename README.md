@@ -15,48 +15,50 @@ GoScry is a server application written in Go that acts as a bridge between a con
 ## Architecture Diagram
 
 ```mermaid
-graph TD
-    subgraph "GoScry Server"
-        API[API Server]
-        TaskMgr[Task Manager]
-        BrowserMgr[Browser Manager]
-    end
-    
-    subgraph "External Services"
-        Client[Client/LLM]
-        Chrome[Chrome Browser]
-        Websites[Target Websites]
-    end
-    
-    Client -->|Submit Task| API
-    API -->|Process Task| TaskMgr
-    TaskMgr -->|Execute Actions| BrowserMgr
-    BrowserMgr -->|CDP Commands| Chrome
-    Chrome -->|HTTP Requests| Websites
-    Websites -->|Response| Chrome
-    Chrome -->|DOM/Results| BrowserMgr
-    BrowserMgr -->|Action Results| TaskMgr
-    TaskMgr -->|Task Status/Results| API
-    API -->|Callbacks/Responses| Client
-    
-    subgraph "Core Packages"
-        style CorePackages fill:#f9f9f9,stroke:#333,stroke-width:1px
-        TaskTypes[taskstypes]
-        Tasks[tasks]
-        Browser[browser]
-        Server[server]
-        Config[config]
-        DOM[dom]
-    end
+sequenceDiagram
+    participant Client as LLM System / API Client
+    participant GS as GoScry Server (API)
+    participant TM as Task Manager
+    participant BM as Browser Manager
+    participant CDP as Chrome (via CDP)
+    participant Site as Target Website
 
-    TaskTypes -.->|Shared Types| Tasks
-    TaskTypes -.->|Shared Types| Browser
-    Tasks -->|Uses| Browser
-    Server -->|Uses| Tasks
-    Browser -->|Uses| DOM
-    Tasks -->|Uses| Config
-    Browser -->|Uses| Config
-    Server -->|Uses| Config
+    Client->>+GS: POST /api/v1/tasks (Task JSON)
+    GS->>+TM: SubmitTask(task)
+    TM-->>GS: TaskID
+    GS-->>-Client: 202 Accepted (TaskID)
+    Note right of TM: Task Execution starts async
+    TM->>BM: ExecuteActions(actions)
+    BM->>+CDP: Run CDP Commands (Navigate, Click, etc.)
+    CDP->>+Site: HTTP Request
+    Site-->>-CDP: HTTP Response (HTML, etc.)
+    CDP-->>-BM: Action Result / DOM State
+    BM-->>TM: Action Completed / Error
+    alt 2FA Required (e.g., after login action)
+        TM->>BM: ExecuteAction(detect2FAPrompt)
+        BM->>CDP: Check page state for 2FA indicators
+        CDP->>BM: Presence result
+        BM->>TM: Prompt detected/not detected
+        opt Prompt Detected
+            TM->>TM: Update Task Status (WaitingFor2FA)
+            TM-->>Client: Notify Callback (MCP 2FA Request)
+            Note over Client, TM: Client retrieves code externally
+            Client->>+GS: POST /api/v1/tasks/{id}/2fa (Code)
+            GS->>+TM: Provide2FACode(id, code)
+            TM->>TM: Signal/Resume Task Execution
+            Note right of TM: Next action types the 2FA code
+            TM->>BM: ExecuteActions(type 2FA code, submit)
+            BM->>+CDP: Type Code, Submit
+            CDP->>+Site: Verify 2FA
+            Site-->>-CDP: Login Success/Failure
+            CDP-->>-BM: Result
+            BM-->>TM: Action Completed
+        end
+    end
+    TM->>TM: Process Final Result / Format MCP
+    TM-->>Client: Notify Callback (MCP Result/Status)
+    TM->>TM: Update Task Status (Completed/Failed)
+    Note over TM: Task finished execution.
 ```
 
 ## Package Structure
