@@ -1,0 +1,39 @@
+# Version control directories
+.git/
+.github/
+
+# Temporary directories
+/tmp/
+
+# Configuration files
+config.yaml
+.env
+
+# Build artifacts
+/bin/
+/build/
+*.exe
+*.out
+*.log
+
+# Development-specific files
+*.md
+!README.md
+LICENSE
+docs/
+examples/
+.vscode/
+*.test
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Terraform files if present
+*.tf
+.terraform/
+
+# Dependencies that will be fetched during build
+vendor/
+
+# Traefik configuration
+traefik/

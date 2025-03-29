@@ -1,0 +1,40 @@
+http:
+  middlewares:
+    secure-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+    
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m
+
+  routers:
+    goscry-router:
+      rule: "Host(`goscry.example.com`)"
+      service: goscry-service
+      entryPoints:
+        - websecure
+      middlewares:
+        - secure-headers
+        - rate-limit
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    goscry-service:
+      loadBalancer:
+        servers:
+          - url: "http://goscry:8080"
+        healthCheck:
+          path: /health
+          interval: "30s"
+          timeout: "5s"
