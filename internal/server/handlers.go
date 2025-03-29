@@ -149,7 +149,7 @@ func (h *APIHandler) HandleGetDomAST(w http.ResponseWriter, r *http.Request) {
 	// Run the DOM AST action
 	err := chromedp.Run(browserCtx,
 		chromedp.Navigate(req.URL),
-		chromedp.Sleep(2*time.Second), // Give the page time to load
+		chromedp.Sleep(5*time.Second), // Increased wait time to ensure page loads fully
 		dom.GetDomASTAction(req.ParentSelector, &domAST),
 	)
 

@@ -67,11 +67,11 @@ func simplifyNode(w io.Writer, n *html.Node) error {
 		allowedTags := map[string]bool{
 			"html": true, "head": true, "body": true, "title": true,
 			"h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
-			"p": true, "div": true, "span": true, "br": true, "hr": true,
+			"p": true, "div": true, "span": true, "br": false, "hr": false,
 			"ul": true, "ol": true, "li": true,
 			"table": true, "thead": true, "tbody": true, "tfoot": true, "tr": true, "th": true, "td": true,
-			"a": true, "button": true, "input": true, "textarea": true, "select": true, "option": true, "label": true,
-			"form": true, "img": true, "pre": true, "code": true, "strong": true, "em": true, "b": true, "i": true,
+			"a": true, "button": true, "input": false, "textarea": true, "select": true, "option": true, "label": true,
+			"form": true, "img": false, "pre": true, "code": true, "strong": true, "em": true, "b": true, "i": true,
 		}
 		if !allowedTags[n.Data] {
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -239,7 +239,10 @@ func GetDomAST(ctx context.Context, htmlContent, parentSelector string) (*DomNod
 		}
 		
 		// Process the HTML document
-		processNode(doc, root)
+		// Process children of the HTML node directly
+		for c := doc.FirstChild; c != nil; c = c.NextSibling {
+			processNode(c, root)
+		}
 		return root, nil
 	}
 
@@ -276,6 +279,23 @@ func GetDomAST(ctx context.Context, htmlContent, parentSelector string) (*DomNod
 				} else if parentSelector == n.Data {
 					parentNode = n
 					return
+				}
+			}
+			
+			// Add improved class selector matching (e.g., div.class-name)
+			if len(strings.Split(parentSelector, ".")) > 1 {
+				parts := strings.Split(parentSelector, ".")
+				tagName := parts[0]
+				className := parts[1]
+				
+				// Check if tag name matches and class contains the specified class
+				if n.Data == tagName && classes != "" {
+					for _, class := range strings.Fields(classes) {
+						if class == className || strings.Contains(class, className) {
+							parentNode = n
+							return
+						}
+					}
 				}
 			}
 		}
@@ -378,8 +398,38 @@ func GetDomASTAction(parentSelector string, result *DomNode) chromedp.Action {
 			return err
 		}
 		
-		// Then generate the AST
-		ast, err := GetDomAST(ctx, html, parentSelector)
+		// If there's a parent selector, try to get that element's HTML directly using chromedp
+		if parentSelector != "" {
+			var parentHTML string
+			var exists bool
+			
+			// Check if the element exists first
+			if err := chromedp.Evaluate(fmt.Sprintf(`document.querySelector("%s") !== null`, parentSelector), &exists).Do(ctx); err != nil {
+				return err
+			}
+			
+			if !exists {
+				return fmt.Errorf("parent selector '%s' not found", parentSelector)
+			}
+			
+			// Get the HTML for that specific element
+			if err := chromedp.OuterHTML(parentSelector, &parentHTML).Do(ctx); err != nil {
+				return fmt.Errorf("error getting parent element: %w", err)
+			}
+			
+			// Generate AST from the parent HTML
+			ast, err := GetDomAST(ctx, parentHTML, "")
+			if err != nil {
+				return err
+			}
+			
+			// Copy the result
+			*result = *ast
+			return nil
+		}
+		
+		// If no parent selector, process the full HTML
+		ast, err := GetDomAST(ctx, html, "")
 		if err != nil {
 			return err
 		}

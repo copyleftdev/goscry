@@ -13,6 +13,7 @@ GoScry is a server application written in Go that acts as a bridge between a con
 * **Authentication Handling:** Supports basic username/password login sequences within tasks.
 * **2FA Support (Manual Hook):** Detects potential 2FA prompts and signals back via API/callback, allowing an external system or user to provide the code to continue the task.
 * **DOM Extraction:** Retrieve full HTML, text content, or a simplified version of the DOM.
+* **DOM AST:** Generate a structured Abstract Syntax Tree representation of the DOM with optional scope control.
 * **MCP Output:** Formats asynchronous results/status updates (e.g., via callbacks) according to the Model Context Protocol (spec 2025-03-26) for clear, structured context reporting.
 * **Configurable:** Manage server port, browser settings, logging, and security via a YAML file or environment variables.
 
@@ -24,6 +25,7 @@ sequenceDiagram
     participant GS as GoScry Server (API)
     participant TM as Task Manager
     participant BM as Browser Manager
+    participant DOM as DOM Processor
     participant CDP as Chrome (via CDP)
     participant Site as Target Website
 
@@ -38,6 +40,18 @@ sequenceDiagram
     Site-->>-CDP: HTTP Response (HTML, etc.)
     CDP-->>-BM: Action Result / DOM State
     BM-->>TM: Action Completed / Error
+    
+    alt DOM AST Retrieval
+        Client->>+GS: POST /api/v1/dom/ast (URL, ParentSelector)
+        GS->>+DOM: GetDomAST(URL, ParentSelector)
+        DOM->>+CDP: ChromeDP Actions (Navigate, GetHTML)
+        CDP->>+Site: HTTP Request
+        Site-->>-CDP: HTTP Response (HTML)
+        CDP-->>-DOM: HTML Content
+        DOM-->>-GS: DOM AST Structure
+        GS-->>-Client: 200 OK (AST JSON)
+    end
+    
     alt 2FA Required (e.g., after login action)
         TM->>BM: ExecuteAction(detect2FAPrompt)
         BM->>CDP: Check page state for 2FA indicators
@@ -163,6 +177,11 @@ The API listens on the configured port (default 8080) under the `/api/v1` path p
     * **Response (Success):** `200 OK` with simple success message.
     * **Response (Error):** `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict` (if task not waiting), `408 Request Timeout` (if task timed out waiting), `500 Internal Server Error`.
 
+* **`POST /api/v1/dom/ast`**: Get a DOM Abstract Syntax Tree from a URL with optional parent selector.
+    * **Request Body:** `GetDomASTRequest` JSON (e.g., `{"url": "https://example.com", "parent_selector": "div#main"}` - the parent_selector is optional).
+    * **Response (Success):** `200 OK` with a structured DOM tree represented as nested `DomNode` objects.
+    * **Response (Error):** `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `500 Internal Server Error`.
+
 ### Action Types
 
 The `actions` array in the submit request defines the steps:
@@ -180,6 +199,95 @@ The `actions` array in the submit request defines the steps:
 | `screenshot`      | Captures a full-page screenshot. Result attached to task result.            | No              | Optional JPEG quality (0-100, default 90)                                | `base64` (string) or `png` (bytes) |
 | `get_dom`         | Retrieves DOM content. Result attached to task result.                      | Optional (defaults to `body`) | No                                                                         | `full_html`, `simplified_html`, `text_content` |
 | `run_script`      | Executes arbitrary JavaScript in the page context. Result attached.         | No              | JavaScript code string                                                     | No                          |
+
+## Using the DOM AST API
+
+### Overview
+
+The DOM AST API provides a structured representation of a webpage's Document Object Model (DOM) as an Abstract Syntax Tree. This functionality enables:
+
+- Analyzing page structure programmatically
+- Extracting specific sections of a page with their hierarchical relationships intact
+- Performing targeted content extraction with scope control
+
+### Endpoint
+
+```
+POST /api/v1/dom/ast
+```
+
+### Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `url` | string | Yes | The URL of the webpage to analyze |
+| `parent_selector` | string | No | CSS selector to scope the AST to a specific element (e.g., `#main-content`, `div.container`) |
+
+### Response Structure
+
+Each node in the DOM AST has the following structure:
+
+```json
+{
+  "nodeType": "element",        // "element", "text", "comment", or "document"
+  "tagName": "div",             // HTML tag name (for element nodes)
+  "id": "main",                 // ID attribute (if present)
+  "classes": ["container"],     // Array of CSS classes (if present)
+  "attributes": {               // Map of all attributes
+    "id": "main",
+    "class": "container"
+  },
+  "textContent": "",            // Text content (primarily for text nodes)
+  "children": []                // Array of child nodes
+}
+```
+
+### Example Usage
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/dom/ast \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "url": "https://example.com",
+    "parent_selector": "#main-content"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "nodeType": "element", 
+  "tagName": "div", 
+  "attributes": {"id": "main-content"}, 
+  "children": [
+    {
+      "nodeType": "element",
+      "tagName": "h1",
+      "attributes": {"class": "title"},
+      "children": [],
+      "textContent": "Welcome to Example.com"
+    },
+    {
+      "nodeType": "element",
+      "tagName": "p",
+      "attributes": {},
+      "children": [],
+      "textContent": "This domain is for use in illustrative examples in documents."
+    }
+  ]
+}
+```
+
+### Implementation Notes
+
+- The DOM AST feature uses ChromeDP's selector support for robust CSS selector matching
+- Waits 5 seconds for JavaScript-heavy pages to fully load before processing
+- Works with both simple sites and complex modern web applications that use frameworks like React, Vue, or Angular
+- Handles a wide range of CSS selectors including tag, class, ID, and nested selectors
 
 ## Contribution
 
